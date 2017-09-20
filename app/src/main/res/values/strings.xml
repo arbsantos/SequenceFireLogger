@@ -4,5 +4,9 @@
     To send us your log file use the sync button. </string>
     <string name="sync">Sync</string>
 
-
+    <string name="sign_in_cancelled">sign in canceled</string>
+    <string name="no_internet_connection">No internet access</string>
+    <string name="unknown_error">Unknown error</string>
+    <string name="unknown_sign_in_response">Unknowned sign in</string>
+    <string name="uid">uid</string>
 </resources>

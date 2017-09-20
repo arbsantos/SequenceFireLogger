@@ -1,78 +1,83 @@
 package assistive.com.sequencelogger;
 
 import android.accessibilityservice.AccessibilityService;
-import android.annotation.TargetApi;
-import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
-import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Handler;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
-
-import org.w3c.dom.NodeList;
 
 
 /**
  * Created by andre on 25-May-15.
  */
 public class SequenceLogger extends AccessibilityService {
-    final String TAG = "SequenceLog";
+    final String TAG = SequenceLogger.class.getSimpleName();
     private SequenceManager sm = null;
-    private final int THRESHOLD=100;
 
-    /**
-     * Gets the node text either getText() or contentDescription
-     *
-     * @param src
-     * @return node text/description null if it doesnt have
-     */
-    public static String getText(AccessibilityNodeInfo src) {
-        String text = null;
+    private int clickCounter;
+    private int stateCounter;
 
-        if (src.getText() != null || src.getContentDescription() != null) {
-            if (src.getText() != null)
-                text = src.getText().toString();
-            else
-                text = src.getContentDescription().toString();
-            src.recycle();
-        }
+    private String currentPackage;
 
-        return text;
-    }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
 
         AccessibilityNodeInfo source = event.getSource();
-        String app = event.getPackageName().toString();
-        String alt = "";
-        String step = "";
-        if (event.getText().size() > 0) {
-            step = event.getText().get(0).toString();
-        }
 
-        source = event.getSource();
-        if (source == null) {
-            sm.addStep(step, alt, app);
-            return;
-        }
+        if (event != null) {
+            //Log.d(TAG, "Event Type:" + AccessibilityEvent.eventTypeToString(event.getEventType()));
+            String event_package = "";
+            if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+                clickCounter = 1;
+                //Log.d(TAG, "Click");
 
-        String sourceText = getDescription(source);
-        if (step.length() > 0)
-            alt = sourceText;
-        else
-            step = sourceText;
-        sm.addStep(step, alt, app);
+                if (event.getPackageName() != null) {
+                    event_package = event.getPackageName().toString();
+                    currentPackage = event_package;
+                }
+
+
+                String eventText = "";
+                if (event.getText().size() > 0) {
+                    eventText = event.getText().get(0).toString();
+                }
+
+                //Log.d(TAG, "Event:" + eventText);
+
+                sm.addStep(source, eventText, event_package);
+                clickTimeout.removeCallbacks(click);
+                clickTimeout.postDelayed(click, 1500);
+            } else {
+                clickCounter--;
+                if (event.getPackageName() != null) {
+                    backDetector.postDelayed(new Runnable() {
+                        public void run() {
+                            if (clickCounter < 0) {
+                                sm.possibleBack();
+                                clickCounter++;
+                            }
+                        }
+                    }, 50);
+                }
+            }
+        }
+        //Log.d(TAG, "Click Counter:" + clickCounter);
 
     }
 
+    Handler backDetector = new Handler();
+    Handler clickTimeout = new Handler();
+
+    Runnable click = new Runnable() {
+        public void run() {
+            if (clickCounter > 0)
+                clickCounter = 0;
+        }
+    };
 
 
     /**
@@ -91,49 +96,6 @@ public class SequenceLogger extends AccessibilityService {
         return current;
     }
 
-    /**
-     * If creating macro is active it sends the text of the clicked node
-     */
-    private String getDescription(AccessibilityNodeInfo src) {
-        try {
-            if (src != null) {
-                String text;
-                if ((text = getText(src)) != null) {
-                    return cleanText(text);
-                }
-                else {
-                    int numchild = src.getChildCount();
-                    for (int i = 0; i < numchild; i++) {
-                        if ((text = getText(src.getChild(i))) != null) {
-                            return  cleanText(text);
-                        } else {
-                            src.getChild(i).recycle();
-                        }
-                    }
-                    src = src.getParent();
-                    numchild = src.getChildCount();
-                    for (int i = 0; i < numchild; i++) {
-                        if ((text = getText(src.getChild(i))) != null) {
-
-                            return cleanText(text);
-                        } else {
-                            src.getChild(i).recycle();
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            return "";
-        }
-        return "";
-    }
-
-    private String cleanText(String text) {
-      String  result = text.replaceAll("\""," ");
-        result = text.replaceAll("\'"," ");
-        result = result.substring(0, Math.min(result.length(),THRESHOLD));
-        return result;
-    }
 
     @Override
     public void onInterrupt() {
@@ -143,14 +105,24 @@ public class SequenceLogger extends AccessibilityService {
     @Override
     public void onServiceConnected() {
         sm = sm.sharedInstance();
-        IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
-        BroadcastReceiver mReceiver = new ScreenReceiver();
+        currentPackage = "";
+
+        Intent myIntent = new Intent(this, SignIn.class);
+        myIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(myIntent);
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        filter.addAction(Intent.ACTION_PACKAGE_ADDED);
+        filter.addAction(Intent.ACTION_PACKAGE_CHANGED);
+        filter.addAction(Intent.ACTION_PACKAGE_INSTALL);
+        filter.addAction(Intent.ACTION_PACKAGE_REPLACED);
+
+        BroadcastReceiver mReceiver = new AppAndScreenListener();
         registerReceiver(mReceiver, filter);
         Log.d(TAG, "CONNECTED");
 
     }
-
-
-
 
 }

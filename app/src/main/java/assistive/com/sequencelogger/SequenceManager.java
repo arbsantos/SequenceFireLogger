@@ -1,36 +1,26 @@
 package assistive.com.sequencelogger;
 
-import android.os.Environment;
-import android.util.Log;
+import android.view.accessibility.AccessibilityNodeInfo;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Scanner;
-import java.util.Stack;
-import java.util.regex.Pattern;
+
+import assistive.com.sequencelogger.data.Step;
+import assistive.com.sequencelogger.data.Workflow;
 
 public class SequenceManager {
 
-    private final static String TAG = "SequenceLog";
-    private static final String INIT_FILE = "{\"Sessions\":[";
+    private final static String TAG = SequenceManager.class.getSimpleName();
     private static SequenceManager mSharedInstance = null;
-    private final String INIT_SEQUENCE = "{\"sequence\":[";
-    private final String END_SEQUENCE = "]},";
-    private long lastWrite = 0;
-    private String filepath;
-    private ArrayList<Step> currentSequence;
 
-    //TO ANALYZE LOGS ADD THIS TO THE  END OF THE JSON AND DELETE THE LAST COMMA
-    private static final String END_FILE = "]}";
+    private Workflow currentWorkflow;
+
+    private ArrayList<Workflow> workflows;
+    private String currentPackage;
+
 
     public SequenceManager() {
-        filepath = Environment.getExternalStorageDirectory().toString()
-                + "/sequences.json";
-        currentSequence = new ArrayList<Step>();
+        workflows = new ArrayList<Workflow>();
+        currentPackage = "";
     }
 
     public static SequenceManager sharedInstance() {
@@ -39,43 +29,67 @@ public class SequenceManager {
         return mSharedInstance;
     }
 
-
     public void createSequence() {
-        Log.d(TAG, "new sequence");
-        currentSequence = new ArrayList<Step>();
+        workflows = new ArrayList<Workflow>();
+
     }
 
-    public boolean addStep(String step, String alternative, String application) {
+    public void addStep(AccessibilityNodeInfo node, String eventText, String event_package) {
         long time = System.currentTimeMillis();
-        return currentSequence.add(new Step(step, alternative, time, application));
+
+        if (!currentPackage.equals(event_package)) {
+            currentPackage = event_package;
+            if (currentWorkflow != null)
+                workflows.add(currentWorkflow);
+            currentWorkflow = new Workflow(event_package);
+        }
+
+        currentWorkflow.addStep(new Step(node, eventText, event_package, time));
     }
 
-    public void finishSequence() {
-        File file = new File(filepath);
-        boolean exists = file.exists();
-        FileWriter fw;
-        try {
-            fw = new FileWriter(file, true);
-            if (!exists) {
-                fw.write(INIT_FILE);
-            }
-            fw.write(INIT_SEQUENCE);
-            boolean first = true;
-            for (Step step : currentSequence) {
-                if (first) {
-                    fw.write(step.toString());
-                    first = false;
-                } else {
-                    fw.write(" , " + step.toString());
-                }
-            }
-            fw.write(END_SEQUENCE);
-            fw.close();
 
-        } catch (IOException e) {
-            e.printStackTrace();
+    public void possibleBack() {
+        long time = System.currentTimeMillis();
+        if (currentWorkflow != null)
+            currentWorkflow.addStep(new Step("Back", time));
+    }
+
+    public void saveWorkflows() {
+        if (currentWorkflow!=null && currentWorkflow.size() > 0) {
+            workflows.add(currentWorkflow);
         }
+        currentWorkflow = null;
+
+        cleanWorkflowsBacks(workflows);
+
+        for (Workflow workflow : workflows) {
+
+            String packageName = workflow.getPackageName();
+            ArrayList<Step> value = workflow.getSteps();
+
+            //workflows have to contain at least 3 steps
+            if (value.size() >2) {
+                FirebaseSingleton.addWorkflow(packageName, value);
+            }
+
+            // do what you have to do here
+            // In your case, an other loop.
+        }
+
         createSequence();
+
+
+    }
+
+    private void cleanWorkflowsBacks(ArrayList<Workflow> workflows) {
+        for (Workflow workflow : workflows) {
+
+            workflow.removeLastBacks();
+
+
+            // do what you have to do here
+            // In your case, an other loop.
+        }
     }
 
 
