@@ -6,19 +6,23 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.PixelFormat;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Contacts;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
+import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.ErrorCodes;
 import com.firebase.ui.auth.IdpResponse;
-import com.firebase.ui.auth.ResultCodes;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
@@ -30,6 +34,9 @@ import assistive.com.sequencelogger.data.AppDetails;
 import assistive.com.sequencelogger.data.ScreenDetails;
 import assistive.com.sequencelogger.data.User;
 
+import static android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION;
+import static android.provider.Settings.canDrawOverlays;
+
 public class SignIn extends AppCompatActivity {
 
     private FirebaseAuth mAuth;
@@ -39,11 +46,19 @@ public class SignIn extends AppCompatActivity {
 
     // Choose an arbitrary request code value
     private static final int RC_SIGN_IN = 1223;
+    private static final int CODE_DRAW_OVER_OTHER_APP_PERMISSION = 1904;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_sign_in);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !canDrawOverlays(this)) {
+            Intent permissionIntent = new Intent(ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName()));
+            startActivityForResult(permissionIntent, CODE_DRAW_OVER_OTHER_APP_PERMISSION);
+        }
+
         mAuth = FirebaseAuth.getInstance();
 
         mAuthListener = new FirebaseAuth.AuthStateListener() {
@@ -52,7 +67,7 @@ public class SignIn extends AppCompatActivity {
                 FirebaseUser user = firebaseAuth.getCurrentUser();
                 if (user != null) {
                     // User is signed in
-                    Log.d(TAG, "onAuthStateChanged:signed_in:" + user.getUid());
+                    Logger.debug(TAG, "onAuthStateChanged:signed_in:" + user.getUid());
 
                     SharedPreferences sharedPref = getPreferences(Context.MODE_PRIVATE);
                     String uid = sharedPref.getString(getString(R.string.uid), "");
@@ -63,17 +78,26 @@ public class SignIn extends AppCompatActivity {
 
                 } else {
                     // User is signed out
-                    Log.d(TAG, "onAuthStateChanged:signed_out");
+                    Logger.debug(TAG, "onAuthStateChanged:signed_out");
                     startActivityForResult(
                             AuthUI.getInstance()
                                     .createSignInIntentBuilder()
-                                    .setProviders(Arrays.asList(new AuthUI.IdpConfig.Builder(AuthUI.EMAIL_PROVIDER).build(),
-                                            new AuthUI.IdpConfig.Builder(AuthUI.GOOGLE_PROVIDER).build()))
+                                    .setAvailableProviders(Arrays.asList(new AuthUI.IdpConfig.EmailBuilder().build(), new AuthUI.IdpConfig.GoogleBuilder().build()))
                                     .build(),
                             RC_SIGN_IN);           }
                 // ...
             }
         };
+
+
+//        findViewById(R.id.bt_settings).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                Intent i = new Intent(getApplicationContext(), Settings.class);
+//                startActivity(i);
+//            }
+//        });
+
     }
 
     @Override
@@ -94,14 +118,29 @@ public class SignIn extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         // RC_SIGN_IN is the request code you passed into startActivityForResult(...) when starting the sign in flow.
 
+        if (requestCode == CODE_DRAW_OVER_OTHER_APP_PERMISSION) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (!canDrawOverlays(this)) {
+                    Intent intent = new Intent(ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivityForResult(intent, CODE_DRAW_OVER_OTHER_APP_PERMISSION);
+                }
+            }
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
         if (requestCode == RC_SIGN_IN) {
             IdpResponse response = IdpResponse.fromResultIntent(data);
-
+            if (response == null) {
+                // User pressed back button
+                showSnackbar(R.string.sign_in_cancelled);
+                return;
+            }
             // Successfully signed in
-            if (resultCode == ResultCodes.OK) {
+            if (resultCode == RESULT_OK) {
                 registerUser(FirebaseAuth.getInstance().getCurrentUser().getUid());
 
-                IdpResponse idpResponse = IdpResponse.fromResultIntent(data);
+                //IdpResponse idpResponse = IdpResponse.fromResultIntent(data);
                 /*startActivity(new Intent(this, Main2Activity.class)
                         .putExtra("my_token", idpResponse.getIdpToken()));*/
 
@@ -111,19 +150,13 @@ public class SignIn extends AppCompatActivity {
 
                 return;
             } else {
-                // Sign in failed
-                if (response == null) {
-                    // User pressed back button
-                    showSnackbar(R.string.sign_in_cancelled);
-                    return;
-                }
 
-                if (response.getErrorCode() == ErrorCodes.NO_NETWORK) {
+                if (response.getError().getErrorCode() == ErrorCodes.NO_NETWORK) {
                     showSnackbar(R.string.no_internet_connection);
                     return;
                 }
 
-                if (response.getErrorCode() == ErrorCodes.UNKNOWN_ERROR) {
+                if (response.getError().getErrorCode() == ErrorCodes.UNKNOWN_ERROR) {
                     showSnackbar(R.string.unknown_error);
                     return;
                 }

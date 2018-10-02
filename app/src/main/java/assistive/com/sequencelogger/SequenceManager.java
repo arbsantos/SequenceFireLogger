@@ -1,11 +1,15 @@
 package assistive.com.sequencelogger;
 
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.util.Log;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import java.util.ArrayList;
 
 import assistive.com.sequencelogger.data.Step;
 import assistive.com.sequencelogger.data.Workflow;
+
 
 public class SequenceManager {
 
@@ -18,7 +22,11 @@ public class SequenceManager {
     private String currentPackage;
 
 
-    public SequenceManager() {
+    private String writtenText = "";
+    private AccessibilityNodeInfo writeSource;
+    private String writePackage;
+
+    private SequenceManager() {
         workflows = new ArrayList<Workflow>();
         currentPackage = "";
     }
@@ -29,13 +37,41 @@ public class SequenceManager {
         return mSharedInstance;
     }
 
+    public String getWrittenText() {
+        return writtenText;
+    }
+
+    public void setWrittenText(String writtenText) {
+        this.writtenText = writtenText;
+    }
+
+    public AccessibilityNodeInfo getWriteSource() {
+        return writeSource;
+    }
+
+    public void setWriteSource(AccessibilityNodeInfo writeSource) {
+        this.writeSource = writeSource;
+    }
+
+    public String getWritePackage() {
+        return writePackage;
+    }
+
+    public void setWritePackage(String writePackage) {
+        this.writePackage = writePackage;
+    }
+
     public void createSequence() {
         workflows = new ArrayList<Workflow>();
 
     }
 
-    public void addStep(AccessibilityNodeInfo node, String eventText, String event_package) {
+
+    public void addStep(AccessibilityNodeInfo node, String type, String eventText, String event_package) {
         long time = System.currentTimeMillis();
+
+        Logger.debug(TAG, currentPackage);
+        Logger.debug(TAG, event_package);
 
         if (!currentPackage.equals(event_package)) {
             currentPackage = event_package;
@@ -43,24 +79,32 @@ public class SequenceManager {
                 workflows.add(currentWorkflow);
             currentWorkflow = new Workflow(event_package);
         }
+        currentWorkflow.addStep(new Step(node, type, eventText, event_package, time));
+    }
 
-        currentWorkflow.addStep(new Step(node, eventText, event_package, time));
+    public void addStep(Step step, String event_package) {
+
+        if (!currentPackage.equals(event_package)) {
+            currentPackage = event_package;
+            if (currentWorkflow != null)
+                workflows.add(currentWorkflow);
+            currentWorkflow = new Workflow(event_package);
+        }
+        currentWorkflow.addStep(step);
     }
 
 
-    public void possibleBack() {
-        long time = System.currentTimeMillis();
-        if (currentWorkflow != null)
-            currentWorkflow.addStep(new Step("Back", time));
-    }
+    public void saveWorkflows(Context ctx) {
 
-    public void saveWorkflows() {
+        //Save the last text event if any
+        if(!writtenText.equals("")){
+            this.addStep(writeSource, "SET_TEXT", writtenText, writePackage);
+        }
+
         if (currentWorkflow!=null && currentWorkflow.size() > 0) {
             workflows.add(currentWorkflow);
         }
         currentWorkflow = null;
-
-        cleanWorkflowsBacks(workflows);
 
         for (Workflow workflow : workflows) {
 
@@ -68,12 +112,9 @@ public class SequenceManager {
             ArrayList<Step> value = workflow.getSteps();
 
             //workflows have to contain at least 3 steps
-            if (value.size() >2) {
-                FirebaseSingleton.addWorkflow(packageName, value);
-            }
+            Logger.debug(TAG, "SIZE: " + value.size());
+            FirebaseSingleton.addWorkflow(packageName,getApplicationName(ctx, packageName), value);
 
-            // do what you have to do here
-            // In your case, an other loop.
         }
 
         createSequence();
@@ -81,16 +122,16 @@ public class SequenceManager {
 
     }
 
-    private void cleanWorkflowsBacks(ArrayList<Workflow> workflows) {
-        for (Workflow workflow : workflows) {
-
-            workflow.removeLastBacks();
-
-
-            // do what you have to do here
-            // In your case, an other loop.
+    public String getApplicationName(Context ctx, final String packageName) {
+        String appName = "unknown";
+        PackageManager packageManager = ctx.getPackageManager();
+        try {
+            appName = (String) packageManager.getApplicationLabel(packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA));
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
         }
-    }
 
+        return appName;
+    }
 
 }

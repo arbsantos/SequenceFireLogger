@@ -50,9 +50,9 @@ public class Step {
 
     }
 
-    public Step(AccessibilityNodeInfo node, String eventText,String eventPackage, long timestamp){
+    public Step(AccessibilityNodeInfo node, String type, String eventText,String eventPackage, long timestamp){
         if (node!=null) {
-            this.type="CLICK";
+            this.type=type;
 
             this.text = (node.getText() !=null) ? node.getText().toString(): null;
             this.content = (node.getContentDescription() !=null) ? node.getContentDescription().toString() : null;
@@ -89,16 +89,12 @@ public class Step {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                     multiLine = node.isMultiLine();
                     dismissable = node.isDismissable();
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    contextClickable = node.isContextClickable();
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        contextClickable = node.isContextClickable();
+                    }
                 }
             }
-
-
             this.closestText = getClosestDescription(node);
-
-
         }
 
         this.timestamp = timestamp;

@@ -29,15 +29,20 @@ public class FirebaseSingleton {
         return  database;
     }
 
-    public static void addWorkflow(String appName,ArrayList <Step> steps){
-        Log.d(TAG, "User:"+FirebaseAuth.getInstance().getCurrentUser().getUid() );
+    public static void addWorkflow(String packageName, String appName,ArrayList <Step> steps){
+        Logger.debug(TAG, "User:"+FirebaseAuth.getInstance().getCurrentUser().getUid() );
 
-        String app = cleanText(appName);
-        String workflowId = getDatabase().getReference().child(app).push().getKey();
+        String packageNameClean = cleanText(packageName);
 
-        getDatabase().getReference().child("Apps").child(app).child(workflowId).child("UID").setValue(FirebaseAuth.getInstance().getCurrentUser().getUid());
+        //set the name of the app
+        getDatabase().getReference().child("Apps").child(packageNameClean).child("name").setValue(appName);
+
+        String workflowId = getDatabase().getReference().child(packageNameClean).push().getKey();
+
+        getDatabase().getReference().child("Apps").child(packageNameClean).child(workflowId).child("UID").setValue(FirebaseAuth.getInstance().getCurrentUser().getUid());
+        getDatabase().getReference().child("Apps").child(packageNameClean).child(workflowId).child("timestamp").setValue(System.currentTimeMillis());
         for(Step step : steps)
-            getDatabase().getReference().child("Apps").child(app).child(workflowId).child("Steps").push().setValue(step);
+            getDatabase().getReference().child("Apps").child(packageNameClean).child(workflowId).child("Steps").push().setValue(step);
     }
 
     private static String cleanText(String text) {
@@ -47,7 +52,7 @@ public class FirebaseSingleton {
 
 
     public static void registerUser(User userData) {
-        Log.d(TAG, "Registering User:" + userData.getUid() );
+        Logger.debug(TAG, "Registering User:" + userData.getUid() );
         getDatabase().getReference().child("Users").child(userData.getUid()).setValue(userData);
     }
 

@@ -1,8 +1,8 @@
 package assistive.com.sequencelogger.data;
 
-import android.util.Log;
-
 import java.util.ArrayList;
+
+import assistive.com.sequencelogger.Logger;
 
 /**
  * Created by unzi on 03/03/2017.
@@ -23,7 +23,7 @@ public class Workflow {
     }
 
     public void addStep(Step step){
-        Log.d(TAG,"STEP:" + step.getEventText() + " " + step.getType());
+        Logger.debug(TAG,"STEP:" + step.getEventText() + " " + step.getType());
         steps.add(step);
     }
 
@@ -39,13 +39,5 @@ public class Workflow {
         return packageName;
     }
 
-    public void removeLastBacks() {
-        for(int i=steps.size()-1;i>=0;i--){
-            if(steps.get(i).getType().equals("Back"))
-                steps.remove(i);
-            else{
-                break;
-            }
-        }
-    }
+
 }

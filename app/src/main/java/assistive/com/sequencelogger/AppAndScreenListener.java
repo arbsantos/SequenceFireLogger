@@ -28,11 +28,11 @@ public class AppAndScreenListener extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
 
         if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
-            Log.d(TAG, "REceived Screen On");
-            SequenceManager sm = SequenceManager.sharedInstance();
-            sm.saveWorkflows();
+            Logger.debug(TAG, "Received Screen On");
+            //SequenceManager sm = SequenceManager.sharedInstance();
+            //sm.saveWorkflows();
         }else{
-            Log.d(TAG, "Received update:" + intent.getAction());
+            Logger.debug(TAG, "Received update:" + intent.getAction());
             updateUser(context);
         }
     }
