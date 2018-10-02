@@ -101,6 +101,15 @@ public class SequenceLogger extends AccessibilityService {
                 //CLICK
                 if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED) {
 
+                    if (!writtenText.equals("")) {
+                        sm.addStep(writeSource, "SET_TEXT", writtenText, event_package);
+                        writtenText = "";
+                        writeSource = null;
+                        //WHEN THE USER STOPS THE WORKFLOW WITHOUT CLICK ON ANYTHING ELSE
+                        sm.setWrittenText(writtenText);
+                        sm.setWriteSource(writeSource);
+                    }
+
                     Logger.debug(TAG, "Click");
 
 
@@ -121,15 +130,6 @@ public class SequenceLogger extends AccessibilityService {
                         sm.addStep(source, "CLICK", eventText, event_package);
 
                     lastPackage = event_package;
-
-                    if (!writtenText.equals("")) {
-                        sm.addStep(writeSource, "SET_TEXT", writtenText, event_package);
-                        writtenText = "";
-                        writeSource = null;
-                        //WHEN THE USER STOPS THE WORKFLOW WITHOUT CLICK ON ANYTHING ELSE
-                        sm.setWrittenText(writtenText);
-                        sm.setWriteSource(writeSource);
-                    }
 
                 //TEXT
                 }else if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
